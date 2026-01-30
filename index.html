@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KravasTV Interactive</title>
+    <style>
+        /* 1. SETUP */
+        body {
+            background-color: #000;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+            cursor: url('cursor.png'), auto;
+        }
+
+        /* 2. CONTAINER */
+        .container {
+            position: relative;
+            aspect-ratio: 16 / 9;
+            width: 100vw;
+            max-height: 100vh;
+            max-width: 177.78vh;
+            background: #000;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* 3. VIDEOS */
+        video {
+            width: 100%; height: 100%;
+            display: block; object-fit: contain;
+            position: absolute; top: 0; left: 0;
+            pointer-events: none; 
+        }
+
+        #introVideo { z-index: 50; display: block; }
+        #intermediateVideo { z-index: 40; display: none; }
+        #menuLoop { z-index: 20; display: none; }
+        #mainVideo { z-index: 10; display: none; }
+
+
+        /* 4. INITIALIZE SCREEN */
+        #startOverlay {
+            position: absolute; z-index: 999;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #000;
+            display: flex; justify-content: center; align-items: center;
+            pointer-events: auto;
+        }
+
+        #startBtn {
+            padding: 20px 40px; font-size: 24px;
+            background: transparent; color: #fff;
+            border: 2px solid #fff; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 2px;
+            transition: 0.3s;
+        }
+        #startBtn:hover { background: #fff; color: #000; }
+
+
+        /* 5. PUZZLE BUTTONS */
+        #puzzleContainer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 60; display: block; 
+        }
+
+        .puzzle-btn {
+            position: absolute;
+            width: 12%; 
+            aspect-ratio: 1 / 1; 
+            border-radius: 50%;
+            
+            /* INVISIBLE MODE: Set to 0.5 to see them, 0 to hide them */
+            opacity: 0; 
+            
+            display: flex; justify-content: center; align-items: center; text-align: center;
+            font-weight: bold; font-size: 1.2vw;
+            cursor: url('cursor_hover.png'), pointer;
+            transition: all 0.3s ease;
+            pointer-events: auto;
+        }
+
+        /* Hover Effect (Only visible if you set opacity > 0 above) */
+        .puzzle-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* ACCESS GRANTED (Green feedback) */
+        .puzzle-btn.granted {
+            opacity: 1 !important;
+            background: rgba(0, 255, 0, 0.3);
+            border: 2px solid #0f0;
+            color: #0f0;
+            box-shadow: 0 0 30px #0f0;
+        }
+
+        /* ACCESS DENIED (Red feedback) */
+        .puzzle-btn.denied {
+            opacity: 1 !important;
+            background: rgba(255, 0, 0, 0.4);
+            border: 2px solid #f00;
+            color: #f00;
+            box-shadow: 0 0 30px #f00;
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            50% { transform: translateX(10px); }
+            75% { transform: translateX(-10px); }
+            100% { transform: translateX(0); }
+        }
+
+        /* POSITIONS */
+        #puz1 { top: 20%; left: 50%; transform: translateX(-50%); } 
+        #puz2 { bottom: 20%; left: 20%; } 
+        #puz3 { bottom: 20%; right: 20%; } 
+
+
+        /* 6. INTERMEDIATE BUTTON (INVISIBLE UPDATE) */
+        #btnEnter {
+            position: absolute;
+            z-index: 45;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 20%; height: 15%;
+            
+            display: none; /* Logic controls display */
+            
+            /* TOTALLY INVISIBLE */
+            background: transparent;
+            border: none;
+            color: transparent; 
+            
+            cursor: url('cursor_hover.png'), pointer;
+            pointer-events: auto;
+        }
+
+
+        /* 7. MENU GRID */
+        .button-grid {
+            position: absolute; z-index: 30;
+            bottom: 3%; left: 10%; width: 80%; height: 18%;
+            display: none; 
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: 1fr 1fr;
+            gap: 10px;
+        }
+        .hotspot { background: transparent; border: none; cursor: url('cursor_hover.png'), pointer; }
+
+        /* 8. RETURN BUTTON */
+        .home-btn {
+            position: absolute; top: 4%; right: 4%; z-index: 100;
+            background: rgba(0,0,0,0.8); color: white; border: 1px solid white;
+            padding: 10px 20px; cursor: url('cursor_hover.png'), pointer;
+            display: none; text-transform: uppercase; font-size: 1vw;
+        }
+        .home-btn:hover { background: white; color: black; }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+
+        <video id="introVideo" loop playsinline><source src="videos/intro.mp4" type="video/mp4"></video>
+        <video id="intermediateVideo" loop playsinline><source src="videos/intermediate.mp4" type="video/mp4"></video>
+        <video id="menuLoop" loop playsinline><source src="videos/menu_loop.mp4" type="video/mp4"></video>
+        <video id="mainVideo" playsinline><source src="video.mp4" type="video/mp4"></video>
+
+        <div id="startOverlay">
+            <button id="startBtn" onclick="systemStart()">INITIALIZE SYSTEM</button>
+        </div>
+
+        <div id="puzzleContainer">
+            <div class="puzzle-btn" id="puz1" onclick="checkPuzzle('puz1')">1</div>
+            <div class="puzzle-btn" id="puz2" onclick="checkPuzzle('puz2')">2</div>
+            <div class="puzzle-btn" id="puz3" onclick="checkPuzzle('puz3')">3</div>
+        </div>
+        
+        <div id="btnEnter" onclick="goToMenu()"></div>
+
+        <div class="button-grid" id="menuButtons">
+            <button class="hotspot" onclick="playSection(0)"></button>
+            <button class="hotspot" onclick="playSection(60)"></button>
+            <button class="hotspot" onclick="playSection(120)"></button>
+            <button class="hotspot" onclick="playSection(180)"></button>
+            <button class="hotspot" onclick="playSection(240)"></button>
+            <button class="hotspot" onclick="playSection(300)"></button>
+            <button class="hotspot" onclick="playSection(360)"></button>
+            <button class="hotspot" onclick="playSection(420)"></button>
+            <button class="hotspot" onclick="playSection(480)"></button>
+            <button class="hotspot" onclick="playSection(540)"></button>
+        </div>
+
+        <button class="home-btn" id="homeBtn" onclick="returnToMenu()">Return to Menu</button>
+
+    </div>
+
+<script>
+    const introVideo = document.getElementById("introVideo");
+    const intermediateVideo = document.getElementById("intermediateVideo");
+    const menuLoop = document.getElementById("menuLoop");
+    const mainVideo = document.getElementById("mainVideo");
+    
+    const startOverlay = document.getElementById("startOverlay");
+    const puzzleContainer = document.getElementById("puzzleContainer");
+    const btnEnter = document.getElementById("btnEnter");
+    const menuButtons = document.getElementById("menuButtons");
+    const homeBtn = document.getElementById("homeBtn");
+
+    // --- PUZZLE LOGIC ---
+    // Order: Top(1), BottomLeft(2), BottomRight(3)
+    const correctSequence = ['puz1', 'puz2', 'puz3']; 
+    let currentStep = 0; 
+
+    function checkPuzzle(clickedId) {
+        const btn = document.getElementById(clickedId);
+
+        if (clickedId === correctSequence[currentStep]) {
+            // Correct
+            btn.classList.add("granted");
+            btn.innerHTML = "OK"; 
+            currentStep++; 
+
+            if (currentStep === correctSequence.length) {
+                // WIN sequence
+                setTimeout(() => {
+                    goToIntermediate();
+                }, 800);
+            }
+        } else {
+            // Wrong
+            btn.classList.add("denied");
+            btn.innerHTML = "X";
+            currentStep = 0; 
+
+            setTimeout(() => {
+                resetPuzzleBoard();
+            }, 1000);
+        }
+    }
+
+    function resetPuzzleBoard() {
+        const allBtns = document.querySelectorAll('.puzzle-btn');
+        allBtns.forEach(b => {
+            b.classList.remove("granted");
+            b.classList.remove("denied");
+            if(b.id === 'puz1') b.innerHTML = "1";
+            if(b.id === 'puz2') b.innerHTML = "2";
+            if(b.id === 'puz3') b.innerHTML = "3";
+        });
+    }
+
+    function systemStart() {
+        startOverlay.style.display = "none";
+        introVideo.muted = false;
+        introVideo.play().catch(e => alert("Play Error: " + e));
+
+        try {
+            let elem = document.documentElement;
+            if (elem.requestFullscreen) { elem.requestFullscreen(); }
+            else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+        } catch(err) { console.log("Fullscreen blocked"); }
+    }
+
+    function goToIntermediate() {
+        introVideo.pause(); introVideo.style.display = "none";
+        puzzleContainer.style.display = "none";
+
+        intermediateVideo.style.display = "block";
+        intermediateVideo.play();
+        
+        // Just make it clickable. No opacity animation needed.
+        btnEnter.style.display = "block";
+    }
+
+    function goToMenu() {
+        intermediateVideo.pause(); intermediateVideo.style.display = "none";
+        btnEnter.style.display = "none";
+
+        menuLoop.style.display = "block";
+        menuLoop.play();
+        
+        menuButtons.style.display = "grid";
+    }
+
+    function playSection(seconds) {
+        mainVideo.style.display = "block"; mainVideo.currentTime = seconds; mainVideo.play();
+        menuLoop.pause(); menuLoop.style.display = "none";
+        menuButtons.style.display = "none";
+        homeBtn.style.display = "block";
+    }
+
+    function returnToMenu() {
+        mainVideo.pause(); mainVideo.style.display = "none";
+        menuLoop.style.display = "block"; menuLoop.play();
+        menuButtons.style.display = "grid";
+        homeBtn.style.display = "none";
+    }
+</script>
+
+</body>
+</html>
